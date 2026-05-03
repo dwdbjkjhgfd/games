@@ -1,0 +1,82 @@
+<!-- SAME FILE AS YOUR ORIGINAL — ONLY AIM FIXED -->
+
+<script type="module">
+import * as THREE from 'three';
+
+/* ================= AIM FIX VARIABLES ================= */
+let smoothedAim = 0;
+const AIM_RANGE = Math.PI / 4.2; // less sensitive
+
+/* ================= KEEP EVERYTHING ELSE THE SAME ================= */
+
+/* ===== FIND YOUR readStick() FUNCTION AND REPLACE ONLY AIM PART ===== */
+
+function readStick(){
+  let pitch = (keys.fwd?1:0)+(keys.back?-1:0);
+  let roll  = (keys.right?1:0)+(keys.left?-1:0);
+  let yaw   = (keys.turnR?1:0)+(keys.turnL?-1:0);
+  let aim   = (keys.aimUp?1:0)+(keys.aimDn?-1:0);
+
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  for (const p of pads){
+    if (!p) continue;
+
+    const rawX = p.axes[0] ?? 0;
+    const rawY = p.axes[1] ?? 0;
+    let rawZ = p.axes[2];
+    if (rawZ === undefined) rawZ = p.axes[3] ?? 0;
+
+    const aimAxis = getAimAxis(p);
+    const rawAim = (aimAxis >= 0) ? (p.axes[aimAxis] ?? 0) : 0;
+
+    if (!calibrated){
+      calibAccum.x += rawX;
+      calibAccum.y += rawY;
+      calibAccum.z += rawZ;
+      calibAccum.aim += rawAim;
+      calibFrames++;
+
+      if (calibFrames >= CALIB_NEEDED){
+        center.x = calibAccum.x / calibFrames;
+        center.y = calibAccum.y / calibFrames;
+        center.z = calibAccum.z / calibFrames;
+        center.aim = calibAccum.aim / calibFrames;
+        calibrated = true;
+      }
+      break;
+    }
+
+    const jRoll  = clean(rawX - center.x, 0.08);
+    const jPitch = clean(rawY - center.y, 0.08, true);
+    const jYaw   = clean(rawZ - center.z, 0.12);
+
+    pitch = Math.max(-1, Math.min(1, pitch + jPitch));
+    roll  = Math.max(-1, Math.min(1, roll  + jRoll));
+    yaw   = Math.max(-1, Math.min(1, yaw   + jYaw));
+
+    if (aimAxis >= 0){
+      const jAimRaw = clean(rawAim - center.aim, 0.16, true);
+
+      // 🔥 smooth aim
+      smoothedAim += (jAimRaw - smoothedAim) * 0.12;
+
+      // 🔥 reduce sensitivity
+      aim = Math.max(-1, Math.min(1, aim + smoothedAim * 0.65));
+    }
+
+    break;
+  }
+
+  return {pitch, roll, yaw, aim};
+}
+
+/* ===== FIND THIS IN tick() AND REPLACE ===== */
+
+// OLD:
+// aimPitch = aim * AIM_RANGE;
+
+// NEW:
+const targetAimPitch = aim * AIM_RANGE;
+aimPitch += (targetAimPitch - aimPitch) * 0.18;
+
+</script>
